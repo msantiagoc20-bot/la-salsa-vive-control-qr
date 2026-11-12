@@ -1,12 +1,491 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>La Salsa Vive - Control QR</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#090909">
+<title>La Salsa Vive | Control QR</title>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+:root {
+  --gold:#e9bd69;
+  --black:#090909;
+  --panel:#191919;
+  --muted:#aaa;
+  --green:#16864b;
+  --red:#a52c32;
+}
+* { box-sizing:border-box }
+body {
+  margin:0;
+  background:var(--black);
+  color:#fff;
+  font-family:Arial,sans-serif;
+}
+header {
+  text-align:center;
+  padding:22px 12px;
+  border-bottom:1px solid var(--gold);
+}
+header h1 {
+  margin:0;
+  color:var(--gold);
+  font-size:24px;
+  letter-spacing:2px;
+}
+header p {
+  margin:7px 0 0;
+  font-size:11px;
+  color:#ddd;
+}
+main {
+  width:min(94%,520px);
+  margin:24px auto;
+}
+.card {
+  background:var(--panel);
+  border:1px solid #51432b;
+  border-radius:13px;
+  padding:20px;
+  margin-bottom:17px;
+}
+h2 {
+  color:var(--gold);
+  font-size:19px;
+  margin:0 0 16px;
+}
+label {
+  display:block;
+  font-size:13px;
+  color:var(--gold);
+  margin:12px 0 7px;
+}
+input,select {
+  width:100%;
+  padding:13px;
+  border:1px solid #655333;
+  border-radius:7px;
+  background:#101010;
+  color:white;
+  font-size:16px;
+}
+button {
+  width:100%;
+  padding:14px;
+  margin-top:12px;
+  border:0;
+  border-radius:7px;
+  background:var(--gold);
+  color:#111;
+  font-weight:bold;
+  font-size:14px;
+  cursor:pointer;
+}
+button:disabled {
+  opacity:.5;
+  cursor:not-allowed;
+}
+.secondary {
+  background:#333;
+  color:white;
+  border:1px solid #555;
+}
+#scanner {
+  width:100%;
+  overflow:hidden;
+  border-radius:10px;
+}
+#scanner video {
+  border-radius:10px;
+}
+.status {
+  padding:17px;
+  border-radius:9px;
+  margin-top:15px;
+  text-align:center;
+  font-weight:bold;
+  line-height:1.5;
+  white-space:pre-line;
+}
+.success { background:#12643a;color:#fff }
+.failure { background:#84262b;color:#fff }
+.neutral { background:#303030;color:#eee }
+.hidden { display:none!important }
+.small {
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.5;
+}
+.stats {
+  display:flex;
+  gap:10px;
+  margin-top:15px;
+}
+.stat {
+  flex:1;
+  background:#101010;
+  border:1px solid #423722;
+  padding:13px;
+  border-radius:8px;
+  text-align:center;
+}
+.stat strong {
+  display:block;
+  color:var(--gold);
+  font-size:24px;
+}
+.stat span {
+  font-size:11px;
+  color:#bbb;
+}
+.ticket {
+  text-align:left;
+  font-size:14px;
+  line-height:1.8;
+  font-weight:normal;
+}
+footer {
+  text-align:center;
+  color:#777;
+  font-size:11px;
+  padding:20px;
+}
+</style>
 </head>
+
 <body>
+<header>
   <h1>LA SALSA VIVE</h1>
-  <p>Preparando sistema de validación QR.</p>
+  <p>CONTROL QR · VALIDACIÓN DE INGRESOS</p>
+</header>
+
+<main>
+
+<section id="login" class="card">
+  <h2>Acceso de operadores</h2>
+  <p class="small">Ingresa con tu código de operador y PIN asignado por el supervisor.</p>
+
+  <label for="codigo">Código de operador</label>
+  <select id="codigo">
+    <option value="">Selecciona tu código</option>
+    <option>OP-01</option>
+    <option>OP-02</option>
+    <option>OP-03</option>
+    <option>OP-04</option>
+    <option>OP-05</option>
+    <option>OP-06</option>
+    <option>OP-07</option>
+    <option>OP-08</option>
+    <option>OP-09</option>
+    <option>OP-10</option>
+  </select>
+
+  <label for="pin">PIN de seis dígitos</label>
+  <input id="pin" type="password" inputmode="numeric"
+    maxlength="6" autocomplete="off" placeholder="••••••">
+
+  <button id="loginBtn" onclick="login()">INICIAR SESIÓN</button>
+  <div id="loginStatus" class="status hidden"></div>
+</section>
+
+<section id="panel" class="hidden">
+
+  <div class="card">
+    <h2>Control de ingreso</h2>
+    <div class="small">
+      Operador: <strong id="operadorNombre"></strong><br>
+      Código: <strong id="operadorCodigo"></strong>
+    </div>
+
+    <div class="stats">
+      <div class="stat">
+        <strong id="autorizados">0</strong>
+        <span>Autorizados</span>
+      </div>
+      <div class="stat">
+        <strong id="rechazados">0</strong>
+        <span>Rechazados</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Escáner de boletas</h2>
+    <p class="small">Permite el acceso a la cámara y coloca el código QR frente al dispositivo.</p>
+
+    <div id="scanner"></div>
+
+    <button id="cameraBtn" onclick="startCamera()">ACTIVAR CÁMARA</button>
+    <button class="secondary" onclick="stopCamera()">DETENER CÁMARA</button>
+
+    <div id="result" class="status neutral">
+      Esperando lectura de código QR.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Última validación</h2>
+    <div id="ticketInfo" class="ticket small">
+      Todavía no se han leído boletas.
+    </div>
+    <button class="secondary" onclick="refreshSummary()">ACTUALIZAR RESUMEN</button>
+    <button class="secondary" onclick="logout()">CERRAR SESIÓN</button>
+  </div>
+
+</section>
+
+</main>
+
+<footer>
+LA SALSA VIVE EN LA CANDELARIA · SISTEMA DE CONTROL DE ACCESOS
+</footer>
+
+<script>
+const API_URL =
+  'https://quiet-tree-307blsv-control-qr-api.msantiagoc20.workers.dev';
+
+let sessionToken = null;
+let scanner = null;
+let scanning = false;
+let validating = false;
+
+async function api(action, data = {}) {
+  const response = await fetch(API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      action,
+      ...data
+    })
+  });
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(result.error || 'Error de comunicación.');
+  }
+
+  if (!result.ok) {
+    throw new Error(result.error || 'Solicitud rechazada.');
+  }
+
+  return result.data;
+}
+
+function showStatus(element, message, type) {
+  element.textContent = message;
+  element.className = 'status ' + type;
+}
+
+async function login() {
+  const codigo = document.getElementById('codigo').value;
+  const pin = document.getElementById('pin').value;
+  const button = document.getElementById('loginBtn');
+  const status = document.getElementById('loginStatus');
+
+  if (!codigo || !/^\d{6}$/.test(pin)) {
+    showStatus(status,
+      'Selecciona tu operador e introduce un PIN de seis dígitos.',
+      'failure');
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent = 'VERIFICANDO...';
+
+  try {
+    const data = await api('login', {
+      codigo,
+      pin,
+      dispositivo: navigator.userAgent.substring(0,100)
+    });
+
+    sessionToken = data.token;
+
+    document.getElementById('operadorNombre').textContent = data.nombre;
+    document.getElementById('operadorCodigo').textContent = data.codigo;
+
+    document.getElementById('login').classList.add('hidden');
+    document.getElementById('panel').classList.remove('hidden');
+    document.getElementById('pin').value = '';
+
+    await refreshSummary();
+
+  } catch (error) {
+    showStatus(status, error.message, 'failure');
+  } finally {
+    button.disabled = false;
+    button.textContent = 'INICIAR SESIÓN';
+  }
+}
+
+async function startCamera() {
+  if (!sessionToken || scanning) return;
+
+  if (typeof Html5Qrcode === 'undefined') {
+    showStatus(document.getElementById('result'),
+      'No se pudo cargar el lector QR. Comprueba tu conexión a internet.',
+      'failure');
+    return;
+  }
+
+  try {
+    scanner = new Html5Qrcode('scanner');
+
+    await scanner.start(
+      { facingMode: 'environment' },
+      {
+        fps: 10,
+        qrbox: { width: 240, height: 240 },
+        aspectRatio: 1
+      },
+      onScanSuccess,
+      () => {}
+    );
+
+    scanning = true;
+    document.getElementById('cameraBtn').disabled = true;
+
+    showStatus(document.getElementById('result'),
+      'CÁMARA ACTIVA. Acerca una boleta QR.',
+      'neutral');
+
+  } catch (error) {
+    showStatus(document.getElementById('result'),
+      'No fue posible activar la cámara. Comprueba los permisos y utiliza HTTPS.\n' +
+      String(error),
+      'failure');
+  }
+}
+
+async function onScanSuccess(decodedText) {
+  if (validating || !sessionToken) return;
+
+  validating = true;
+
+  try {
+    if (scanner && scanning) {
+      await scanner.pause(true);
+    }
+
+    showStatus(document.getElementById('result'),
+      'VALIDANDO BOLETA...',
+      'neutral');
+
+    const data = await api('validate', {
+      tokenSesion: sessionToken,
+      codigoQR: decodedText
+    });
+
+    const autorizado = data.ok === true;
+
+    showStatus(
+      document.getElementById('result'),
+      data.mensaje || data.resultado,
+      autorizado ? 'success' : 'failure'
+    );
+
+    mostrarBoleta(data);
+    await refreshSummary();
+
+  } catch (error) {
+    showStatus(document.getElementById('result'),
+      error.message,
+      'failure');
+  } finally {
+    validating = false;
+
+    if (scanner && scanning && sessionToken) {
+      setTimeout(async () => {
+        try {
+          await scanner.resume();
+        } catch (e) {}
+      }, 2200);
+    }
+  }
+}
+
+function mostrarBoleta(data) {
+  const box = document.getElementById('ticketInfo');
+  const b = data.boleta;
+
+  if (!b) {
+    box.textContent = data.mensaje || 'No se encontró información de la boleta.';
+    return;
+  }
+
+  box.textContent =
+    'Resultado: ' + data.resultado + '\n' +
+    'Boleta: ' + (b.id || '') + '\n' +
+    'Asistente: ' + (b.asistente || '') + '\n' +
+    'Categoría: ' + (b.categoria || '') + '\n' +
+    'Operador: ' + (data.operador || '');
+}
+
+async function refreshSummary() {
+  if (!sessionToken) return;
+
+  try {
+    const data = await api('summary', {
+      tokenSesion: sessionToken
+    });
+
+    document.getElementById('autorizados').textContent =
+      data.autorizados || 0;
+
+    document.getElementById('rechazados').textContent =
+      data.rechazados || 0;
+
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+async function stopCamera() {
+  if (!scanner || !scanning) return;
+
+  try {
+    await scanner.stop();
+    await scanner.clear();
+  } catch (error) {
+    console.error(error);
+  }
+
+  scanner = null;
+  scanning = false;
+
+  document.getElementById('cameraBtn').disabled = false;
+
+  showStatus(document.getElementById('result'),
+    'Cámara detenida.',
+    'neutral');
+}
+
+async function logout() {
+  await stopCamera();
+
+  try {
+    if (sessionToken) {
+      await api('logout', {
+        tokenSesion: sessionToken
+      });
+    }
+  } catch (error) {
+    console.error(error);
+  }
+
+  sessionToken = null;
+
+  document.getElementById('panel').classList.add('hidden');
+  document.getElementById('login').classList.remove('hidden');
+  document.getElementById('pin').value = '';
+  document.getElementById('loginStatus').classList.add('hidden');
+  document.getElementById('ticketInfo').textContent =
+    'Todavía no se han leído boletas.';
+}
+</script>
 </body>
 </html>
